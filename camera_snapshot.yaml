@@ -1,0 +1,88 @@
+blueprint:
+  name: Camera Snapshot and MQTT Metadata Update
+  description: "Take a snapshot from a camera and update MQTT sensor metadata."
+  domain: script
+
+  input:
+    camera_source_entity:
+      name: "Camera Entity"
+      description: "Select the camera entity to take a snapshot from."
+      selector:
+        entity:
+          domain: camera
+    camera_local_file_entity:
+      name: "Local File Entity"
+      description: "Select the local file entity to update with the snapshot."
+      selector:
+        entity:
+          domain: camera
+          integration: local_file
+
+variables:
+  now: "{{ now() }}"
+  camera_source_entity: !input camera_source_entity
+  camera_local_file_entity: !input camera_local_file_entity
+  camera_local_file_entity_name: "{{ camera_local_file_entity | replace('camera.', '') }}" # Remove 'camera.' prefix
+  mqtt_topic: >-
+    homeassistant/sensor/{{ camera_local_file_entity_name }}_camera_metadata
+  snapshot_base_dir: >-
+    /share/camera/{{ camera_local_file_entity_name }}
+  snapshot_dir: >-
+    {{ snapshot_base_dir }}/{{ now | as_timestamp | timestamp_custom("%Y/%m/%d") }}
+  snapshot_file: >-
+    {{ snapshot_dir }}/{{ now | as_timestamp | timestamp_custom("%Y%m%d-%H%M%S") }}.jpg
+
+  mqtt_sensor_discovery:
+    device:
+      hw_version: 1
+      identifiers: "{{ camera_local_file_entity }}"
+      manufacturer: "Home Assistant"
+      model: "Metadata"
+      name: "{{ state_attr(camera_local_file_entity, 'friendly_name') }} (Metadata)"
+    name: "{{ state_attr(camera_local_file_entity, 'friendly_name') }} (Metadata)"
+    unique_id: "sensor.{{ camera_local_file_entity_name }}_camera_metadata"
+    default_entity_id: "sensor.{{ camera_local_file_entity_name }}_camera_metadata"
+    state_topic: "{{ mqtt_topic }}"
+    icon: "mdi:motion-sensor"
+    device_class: "timestamp"
+    json_attributes_topic: "{{ mqtt_topic }}"
+
+
+
+sequence:
+  - action: camera.snapshot
+    data:
+      filename: "{{ snapshot_file }}"
+    target:
+      entity_id: "{{ camera_source_entity }}"
+  - data:
+      file_path: "{{ snapshot_file }}"
+    action: local_file.update_file_path
+    target:
+      entity_id: "{{ camera_local_file_entity }}"
+  - action: mqtt.publish
+    metadata: {}
+    data:
+      evaluate_payload: false
+      qos: "0"
+      retain: true
+      topic: "{{ mqtt_topic }}"
+      payload: |-
+        {{
+          dict(last_triggered=now, snapshot_file=snapshot_file, camera_source_entity=camera_source_entity, camera_local_file_entity=camera_local_file_entity) | to_json
+        }}
+  - action: mqtt.publish
+    metadata: {}
+    data:
+      evaluate_payload: false
+      qos: "0"
+      retain: true
+      topic: "homeassistant/sensor/{{ camera_local_file_entity_name }}_camera_metadata/config"
+      payload: |-
+        {{ dict(mqtt_sensor_discovery, value_template='{{ value_json.last_triggered | as_datetime }}', json_attributes_template='{{ value_json | tojson }}' ) | to_json }}
+
+
+alias: "[Kamera] Aktualisiere Snapshot von {{ camera_source_entity }} nach {{ camera_local_file_entity }}"
+description: ""
+
+
