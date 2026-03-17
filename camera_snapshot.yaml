@@ -50,6 +50,9 @@ variables:
 
 
 sequence:
+  - action: pyscript.ensure_directory
+    data:
+      path: "{{ snapshot_dir }}"
   - action: camera.snapshot
     data:
       filename: "{{ snapshot_file }}"
