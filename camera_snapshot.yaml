@@ -50,10 +50,8 @@ variables:
 
 
 sequence:
-  - action: pyscript.ensure_directory
-    data:
-      path: "{{ snapshot_dir }}"
   - action: camera.snapshot
+    continue_on_error: true
     data:
       filename: "{{ snapshot_file }}"
     target:
@@ -61,6 +59,7 @@ sequence:
   - data:
       file_path: "{{ snapshot_file }}"
     action: local_file.update_file_path
+    continue_on_error: true
     target:
       entity_id: "{{ camera_local_file_entity }}"
   - action: mqtt.publish
