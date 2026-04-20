@@ -1,0 +1,32 @@
+blueprint:
+  name: "Mobile App Location Update"
+  description: "Sends request_location_update to multiple mobile app devices in parallel."
+  domain: script
+
+  input:
+    notify_targets:
+      name: "Mobile App Devices"
+      description: "Select the mobile app devices to trigger a location update on."
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+          multiple: true
+
+variables:
+  notify_targets: !input notify_targets
+
+sequence:
+  - repeat:
+      for_each: "{{ notify_targets }}"
+      sequence:
+        - variables:
+            notify_action: >-
+              notify.mobile_app_{{ device_attr(repeat.item, 'name') | lower | replace(' ', '_') | replace('-', '_') | replace("'", '') }}
+        - action: "{{ notify_action }}"
+          data:
+            message: request_location_update
+
+alias: "[Mobile Devices] Location Update"
+description: "Sends request_location_update to all configured mobile app devices."
+icon: mdi:tablet-cellphone
