@@ -1,6 +1,6 @@
 blueprint:
   name: "[go-hass-agent] D-Bus Rich Notification"
-  description: >-
+  description: |-
     Sendet eine Desktop-Notification über go-hass-agent via MQTT und
     org.freedesktop.Notifications.Notify (FreeDesktop-Standard).
 
@@ -10,6 +10,30 @@ blueprint:
 
     **Voraussetzung:** go-hass-agent läuft auf dem Zielgerät mit MQTT-Konfiguration.
     Das MQTT-Topic lautet `{prefix}/{hostname}/dbuscommand`.
+
+    ---
+
+    **Icons** werden als Themenname oder absoluter Pfad angegeben.
+
+    *Themenname:* Der Notification-Daemon sucht das Icon im aktiven Desktop-Theme
+    (Fallback: `hicolor`). Fehlt ein Name, wird kein Icon angezeigt.
+    Verfügbare Namen nach Kategorie:
+    - Dialoge: `dialog-information` `dialog-warning` `dialog-error` `dialog-question` `dialog-password` `dialog-ok`
+    - Sicherheit: `security-high` `security-medium` `security-low`
+    - Netzwerk: `network-wired` `network-wireless` `network-offline` `network-transmit` `network-receive`
+    - System: `system-run` `system-shutdown` `system-reboot` `system-lock-screen` `system-log-out`
+    - Batterie: `battery-full` `battery-low` `battery-caution` `battery-empty`
+    - Medien: `audio-volume-high` `audio-volume-muted` `camera-photo` `camera-video`
+    - Kommunikation: `mail-message-new` `mail-unread` `notification-new` `call-start` `call-stop`
+    - Wetter: `weather-clear` `weather-clouds` `weather-rain` `weather-snow` `weather-storm` `weather-fog`
+    - Kalender: `appointment-new` `appointment-soon` `alarm`
+
+    *Absoluter Pfad:* z.B. `/usr/share/icons/hicolor/48x48/apps/myapp.png`
+
+    Verfügbare Icons auf dem Zielgerät prüfen:
+    `find /usr/share/icons -name "*.svg" -o -name "*.png" | sort`
+
+    ---
 
     **Bilder:** Der `image`-Pfad muss ein absoluter Pfad auf dem *Zielgerät* sein
     (z.B. `/home/user/photo.jpg`). HA-Medien-URLs werden nicht unterstützt, da
