@@ -125,6 +125,17 @@ fields:
         unit_of_measurement: "ms"
         mode: slider
 
+  app_name:
+    name: "Anwendungsname"
+    description: >-
+      Name der sendenden Anwendung (app_name im FreeDesktop-Protokoll).
+      Erscheint im Notification-Daemon als Absender.
+    required: false
+    default: "Home Assistant"
+    advanced: true
+    selector:
+      text:
+
   category:
     name: "Kategorie"
     description: >-
@@ -171,7 +182,8 @@ sequence:
         {%- if (category | default("")) | trim -%}
           {%- set _h.d = dict(_h.d, **{"category": (category | trim)}) -%}
         {%- endif -%}
-        {%- set _args = ["Home Assistant", 0, _icon, _title, message, [], _h.d, _duration] -%}
+        {%- set _app_name = (app_name | default("Home Assistant")) | trim or "Home Assistant" -%}
+        {%- set _args = [_app_name, 0, _icon, _title, message, [], _h.d, _duration] -%}
         {%- set _cmd = {
             "bus": "session",
             "path": "/org/freedesktop/Notifications",
