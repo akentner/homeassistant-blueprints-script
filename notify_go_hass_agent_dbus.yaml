@@ -1,0 +1,190 @@
+blueprint:
+  name: "[go-hass-agent] D-Bus Rich Notification"
+  description: >-
+    Sendet eine Desktop-Notification über go-hass-agent via MQTT und
+    org.freedesktop.Notifications.Notify (FreeDesktop-Standard).
+
+    Unterstützt Icons (Themenname oder absoluter Pfad), Bilder (lokaler Pfad
+    auf dem Zielgerät), HTML-Body (`<b>`, `<i>`, `<u>`, `<a>`), Urgency-Level
+    und Anzeigedauer.
+
+    **Voraussetzung:** go-hass-agent läuft auf dem Zielgerät mit MQTT-Konfiguration.
+    Das MQTT-Topic lautet `{prefix}/{hostname}/dbuscommand`.
+
+    **Bilder:** Der `image`-Pfad muss ein absoluter Pfad auf dem *Zielgerät* sein
+    (z.B. `/home/user/photo.jpg`). HA-Medien-URLs werden nicht unterstützt, da
+    der Notification-Daemon nur lokale Dateien lesen kann.
+  domain: script
+  author: akentner
+  homeassistant:
+    min_version: "2024.6.0"
+  input:
+    target_host:
+      name: "Ziel-Hostname"
+      description: >-
+        Kurzname (`hostname`) des Geräts, auf dem go-hass-agent läuft.
+        Bestimmt das MQTT-Topic: `{prefix}/{hostname}/dbuscommand`
+      selector:
+        text:
+    mqtt_topic_prefix:
+      name: "MQTT Topic Prefix"
+      description: "Basis-Prefix des go-hass-agent MQTT Topics (Standard: gohassagent)"
+      default: "gohassagent"
+      selector:
+        text:
+
+mode: parallel
+max: 10
+
+variables:
+  v_target_host: !input target_host
+  v_topic_prefix: !input mqtt_topic_prefix
+
+fields:
+  title:
+    name: "Titel"
+    description: "Kurzfassung / Überschrift der Notification (summary)"
+    required: false
+    default: "Home Assistant"
+    selector:
+      text:
+
+  message:
+    name: "Nachricht"
+    description: >-
+      Body-Text. Unterstützt basic HTML (Daemon-abhängig):
+      `<b>fett</b>`, `<i>kursiv</i>`, `<u>unterstrichen</u>`, `<a href='…'>Link</a>`
+    required: true
+    selector:
+      text:
+        multiline: true
+
+  icon:
+    name: "Icon"
+    description: >-
+      FreeDesktop-Icon-Themenname (z.B. `dialog-information`) oder absoluter
+      Pfad zu einer Bilddatei auf dem Zielgerät (z.B. `/usr/share/icons/ha.png`).
+    required: false
+    default: "dialog-information"
+    selector:
+      select:
+        custom_value: true
+        options:
+          - label: "ℹ Information"
+            value: "dialog-information"
+          - label: "⚠ Warnung"
+            value: "dialog-warning"
+          - label: "✗ Fehler / Kritisch"
+            value: "dialog-error"
+          - label: "✓ Erfolg"
+            value: "dialog-ok"
+          - label: "🔔 Neue Nachricht"
+            value: "notification-new"
+          - label: "⚙ System"
+            value: "system-run"
+          - label: "🔒 Sicherheit"
+            value: "security-high"
+          - label: "📷 Kamera"
+            value: "camera-photo"
+
+  image:
+    name: "Bild"
+    description: >-
+      Absoluter Pfad zur Bilddatei auf dem Zielgerät (z.B. `/home/user/snapshot.jpg`)
+      oder `file://`-URI. Leer lassen wenn kein Bild benötigt.
+    required: false
+    default: ""
+    selector:
+      text:
+
+  urgency:
+    name: "Dringlichkeit"
+    description: "Kritisch = kein automatischer Timeout, bleibt bis zum Schließen"
+    required: false
+    default: "1"
+    selector:
+      select:
+        options:
+          - label: "0 — Niedrig"
+            value: "0"
+          - label: "1 — Normal"
+            value: "1"
+          - label: "2 — Kritisch (kein Timeout)"
+            value: "2"
+
+  duration:
+    name: "Anzeigedauer"
+    description: "-1 = Systemstandard · 0 = dauerhaft anzeigen"
+    required: false
+    default: 5000
+    selector:
+      number:
+        min: -1
+        max: 30000
+        step: 500
+        unit_of_measurement: "ms"
+        mode: slider
+
+  category:
+    name: "Kategorie"
+    description: >-
+      FreeDesktop-Notification-Kategorie (optional). Beeinflusst Darstellung
+      und Filterung beim Notification-Daemon.
+    required: false
+    default: ""
+    advanced: true
+    selector:
+      select:
+        custom_value: true
+        options:
+          - label: "— keine —"
+            value: ""
+          - label: "device"
+            value: "device"
+          - label: "device.added"
+            value: "device.added"
+          - label: "device.error"
+            value: "device.error"
+          - label: "presence"
+            value: "presence"
+          - label: "im"
+            value: "im"
+          - label: "email"
+            value: "email"
+          - label: "call"
+            value: "call"
+          - label: "network"
+            value: "network"
+          - label: "security"
+            value: "security"
+
+sequence:
+  - variables:
+      v_payload: |-
+        {%- set _icon = icon | default("dialog-information") -%}
+        {%- set _title = title | default("Home Assistant") -%}
+        {%- set _duration = (duration | default(5000)) | int -%}
+        {%- set _h = namespace(d={"urgency": (urgency | default("1")) | int}) -%}
+        {%- if (image | default("")) | trim -%}
+          {%- set _h.d = dict(_h.d, **{"image-path": (image | trim)}) -%}
+        {%- endif -%}
+        {%- if (category | default("")) | trim -%}
+          {%- set _h.d = dict(_h.d, **{"category": (category | trim)}) -%}
+        {%- endif -%}
+        {%- set _args = ["Home Assistant", 0, _icon, _title, message, [], _h.d, _duration] -%}
+        {%- set _cmd = {
+            "bus": "session",
+            "path": "/org/freedesktop/Notifications",
+            "method": "org.freedesktop.Notifications.Notify",
+            "destination": "org.freedesktop.Notifications",
+            "args": _args,
+            "use_session_path": false
+        } -%}
+        {{ _cmd | tojson }}
+
+  - action: mqtt.publish
+    data:
+      topic: "{{ v_topic_prefix }}/{{ v_target_host }}/dbuscommand"
+      payload: "{{ v_payload }}"
+      qos: 0
+      retain: false
